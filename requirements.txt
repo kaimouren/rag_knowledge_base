@@ -1,0 +1,28 @@
+# 直接依赖(不是完整pip freeze,只列项目代码里真正import的顶层包,
+# 版本号是本地venv里实测跑通的版本,不代表其他版本不兼容,只是没测过)
+
+# --- 文本知识类解析(Docling) ---
+docling==2.122.0
+pypdf==6.16.2
+
+# --- 代码知识类解析(ipynb) ---
+nbformat==5.11.1
+
+# --- LlamaParse(文本知识类的降级/补充解析路径) ---
+llama_cloud==2.14.1
+
+# --- 索引 / 检索 ---
+chromadb==1.5.9
+sentence-transformers==6.0.0
+rank-bm25==0.2.2
+
+# --- 生成阶段的chunking(MarkdownHeaderTextSplitter等) ---
+langchain-text-splitters==1.1.2
+
+# --- LLM API ---
+openai==1.109.1
+python-dotenv==1.2.3
+
+# --- 评估(RAGAS) ---
+ragas==0.4.3
+datasets==5.0.1

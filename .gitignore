@@ -1,0 +1,50 @@
+# --- 环境变量 / 密钥 ---
+.env
+.env.local
+# .env.example 不排除,是特意留给别人参考的模板
+
+# --- Python ---
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# --- Claude Code 本地配置(机器相关,不是项目代码) ---
+.claude/settings.local.json
+
+# --- 课程原始数据(按当前项目根目录实际存在的课程文件夹逐一列出) ---
+CSE 414/
+CSE 416/
+ECON 484/
+IEOR E4004 Optimization Models & Methods/
+IEOR E4106 Stochastic Model/
+IEOR E4404 Simulation/
+IEOR E4540 Data Mining/
+IEOR E4573 Deep Learning for NLP/
+ieor 4742 deep learning/
+__MACOSX/
+scratch_test/
+
+# 保险起见,任何位置出现的原始文档格式一律不追踪
+*.pdf
+*.docx
+*.pptx
+*.xlsx
+*.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# --- pipeline生成的中间产物/索引(体积大,且内容衍生自课程原始数据) ---
+ingest/_test_output/
+index/chroma_db/
+index/bm25_index.pkl
+evaluate/qa_candidates_for_review.csv
+evaluate/ragas_results.csv
+evaluate/pipeline_results.json
+evaluate/_diag_text_miss_data.json
+
+# --- 通用系统/编辑器文件 ---
+.DS_Store
+Thumbs.db
