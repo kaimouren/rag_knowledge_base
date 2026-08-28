@@ -18,7 +18,12 @@ from pathlib import Path
 # 大量第三方库源码,不排除的话会把 torch/transformers 这些库代码当成课程
 # 代码扫进来 —— parse_code.py 抽样测试 .py 格式时就是因为漏排除这个目录,
 # 意外抽到了 transformers/scipy 的源码文件才发现这个问题。
-EXCLUDE_DIRS = {".claude", ".git", "ingest", "__MACOSX", ".venv", "index", "query"}
+# evaluate: 项目自己的RAGAS评估脚本目录,同样不是课程数据——这个目录当初
+# 漏加了,导致 evaluate/build_qa_candidates.py 和 evaluate/run_ragas_eval.py
+# 被 run_parse_code_full.py 当成课程代码解析进了知识库,course字段被推断成
+# 不存在的"evaluate"课程(14个chunk),搭Streamlit前端时对着侧边栏统计核对
+# 课程列表才发现。
+EXCLUDE_DIRS = {".claude", ".git", "ingest", "__MACOSX", ".venv", "index", "query", "evaluate"}
 
 # CLAUDE.md "文件分类与处理策略" 一节的映射
 CATEGORY_MAP = {
@@ -94,7 +99,13 @@ def route(data_root: Path):
     for path in data_root.rglob("*"):
         if not path.is_file():
             continue
-        if any(part in EXCLUDE_DIRS for part in path.relative_to(data_root).parts[:-1]):
+        rel_parts = path.relative_to(data_root).parts
+        if len(rel_parts) < 2:
+            # 根目录下没有父目录的文件(比如项目自己的 app.py/README.md)
+            # 一律不算课程数据,EXCLUDE_DIRS按目录名排除对这种文件天然
+            # 失效,详见 run_parse_code_full.py::collect_files() 的注释
+            continue
+        if any(part in EXCLUDE_DIRS for part in rel_parts[:-1]):
             continue
         if is_junk(path.name):
             skipped_junk += 1

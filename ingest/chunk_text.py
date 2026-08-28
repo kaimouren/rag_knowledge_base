@@ -178,15 +178,26 @@ def chunk_document(pdf_rel: str, doc_info: dict) -> List[TextChunk]:
                 char_end = search_cursor + len(piece)
                 search_cursor = char_end
 
+            # quality_flags 检测和position定位都要用原始piece(不含文件名前缀),
+            # 不然"formula-not-decoded"这类检测和在full_text里找偏移量都会失真。
             quality_flags = detect_chunk_quality_flags(piece)
 
             chunk_id = f"txt_{chunk_idx:05d}"
             chunk_idx += 1
 
+            # 把文件名(不含路径,比如"HW2.pdf")拼进可索引文本——跟之前修复
+            # Caregivers SQL案例(parse_code.py的parse_sql)同一套方案: BM25
+            # 查询里如果提到"SQL"这种词,但chunk原文本身不含这个字面词
+            # (比如一段纯markdown内容,只是恰好在一份.sql文件里),会导致
+            # 检索完全找不到——加上文件名能让文件名里的关键词(比如"sql"、
+            # "HW2"这类)也参与匹配,缓解这类词汇鸿沟问题。这个前缀只影响
+            # 存进索引/展示给LLM的text字段,不影响上面的质量检测和定位逻辑。
+            indexed_text = f"{Path(pdf_rel).name}\n{piece}"
+
             chunks.append(
                 TextChunk(
                     chunk_id=chunk_id,
-                    text=piece,
+                    text=indexed_text,
                     metadata={
                         "source_type": "text",
                         "file": pdf_rel,

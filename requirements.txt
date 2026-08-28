@@ -26,3 +26,9 @@ python-dotenv==1.2.3
 # --- 评估(RAGAS) ---
 ragas==0.4.3
 datasets==5.0.1
+
+# --- 数据摘要类解析(xlsx) ---
+openpyxl==3.1.5
+
+# --- 前端 ---
+streamlit==1.62.0

@@ -1,6 +1,11 @@
 """
-把文本知识类chunk(run_chunk_text_full.py的输出)和代码知识类chunk
-(parse_code.py的输出)转成同一套统一schema,合并成一份完整数据集。
+把文本知识类chunk(run_chunk_text_full.py的输出)、代码知识类chunk
+(parse_code.py的输出)、数据摘要类chunk(summarize_data.py的输出)转成
+同一套统一schema,合并成一份完整数据集。
+
+数据摘要类(source_type="data_summary")本身生成的时候就已经是统一schema
+格式(见summarize_data.py::build_chunk),这里直接读取文件、不需要额外的
+字段映射逻辑,和文本/代码知识类需要转换的情况不一样。
 
 字段映射说明(代码知识类原本没有这些字段,这里是新增的映射逻辑,不是
 简单复制):
@@ -36,6 +41,7 @@ from parse_code import PARSERS
 from run_parse_code_full import collect_files
 
 TEXT_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "text_chunks.json"
+DATA_SUMMARY_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "data_summary_chunks.json"
 OUTPUT_PATH = Path(__file__).parent / "_test_output" / "combined_chunks.json"
 
 HIGH_CONFIDENCE_TYPES = {
@@ -109,7 +115,10 @@ def main():
     code_chunks = collect_code_chunks_unified()
     print(f"代码知识类chunk数: {len(code_chunks)}")
 
-    combined = text_chunks + code_chunks
+    data_summary_chunks = json.load(open(DATA_SUMMARY_CHUNKS_PATH, encoding="utf-8"))
+    print(f"数据摘要类chunk数: {len(data_summary_chunks)}")
+
+    combined = text_chunks + code_chunks + data_summary_chunks
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(combined, f, ensure_ascii=False, indent=2)
 

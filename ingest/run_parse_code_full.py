@@ -33,6 +33,15 @@ def collect_files(ext: str):
         if not p.is_file() or p.name.startswith("._"):
             continue
         rel_parts = p.relative_to(DATA_ROOT).parts
+        if len(rel_parts) < 2:
+            # 直接躺在 DATA_ROOT 根目录下、不在任何课程子目录里的文件,
+            # 只可能是项目自身的脚本(比如根目录的 app.py)——EXCLUDE_DIRS
+            # 是按目录名排除的,对这种"没有父目录"的根级文件天然失效
+            # (之前 evaluate/ 目录漏排除导致课程代码里混进项目自己的评估
+            # 脚本,修完那个bug之后,同一类问题又在 app.py 上重现了才发现
+            # 这里还有个结构性漏洞:只要有文件直接放在DATA_ROOT根目录,
+            # 不管叫什么名字,都会绕过EXCLUDE_DIRS)
+            continue
         if any(part in EXCLUDE_DIRS for part in rel_parts[:-1]):
             continue
         files.append(p)

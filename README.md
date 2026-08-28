@@ -61,3 +61,5 @@ OPENAI_API_KEY=...
 - **BM25分词器对纯中文query支持有限**——评估阶段实测发现，纯中文提问会导致BM25分词器产出空token列表（详见 `index/build_bm25_index.py` 的注释和评估记录），这是当前embedding模型（all-MiniLM-L6-v2，纯英文模型）选型和BM25分词器共同的局限，还没有修复。
 - **ragas==0.4.3 有个已知的第三方包兼容性bug**（硬import了已被上游移除的VertexAI集成），本地venv里打了patch才能跑，`evaluate/run_ragas_eval.py` 文件头有完整说明，venv重建后需要重新打这个patch。
 - **RAGAS评估集只有35条**，覆盖文本知识类三种质量状态(good/degraded/llamaparse_done)和代码知识类五种格式，样本量小，评估结果只能看方向，不是统计意义上的严谨结论。
+
+更详细的检索命中率根因排查记录(中文query局限、检索池稀释、文件名索引修复的实测效果)见 [LIMITATIONS.md](LIMITATIONS.md)。
