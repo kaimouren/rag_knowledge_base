@@ -137,17 +137,25 @@ def detect_chunk_quality_flags(text: str) -> Optional[List[str]]:
 # ---------------------------------------------------------------------------
 # 切分主逻辑
 # ---------------------------------------------------------------------------
-def chunk_document(pdf_rel: str, doc_info: dict) -> List[TextChunk]:
-    full_text = doc_info["md_path"].read_text(encoding="utf-8")
+def split_into_pieces(full_text: str) -> List[dict]:
+    """两层切分的核心算法,跟具体来源(Docling/LlamaParse/MinerU)无关——
+    被 chunk_document()(旧的Docling/LlamaParse流程)和 chunk_text_mineru.py
+    (新的MinerU流程)共用,避免同一套切分逻辑维护两份。
 
+    返回列表,每项: {piece, chunk_type, heading, char_start, char_end}。
+    char_start/char_end 是在 full_text 里用片段前50个字符probe定位到的真实
+    字符偏移量,定位不到就退化成"上一个片段结束的地方"累加估算——调用方
+    (chunk_document还是chunk_text_mineru)自己决定这个偏移量意味着什么:
+    前者只能把它标成estimated=true的近似位置,后者可以进一步查
+    page_anchors映射成真实页码。
+    """
     header_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=HEADERS_TO_SPLIT_ON, strip_headers=False)
     header_sections = header_splitter.split_text(full_text)
 
     char_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
 
-    chunks: List[TextChunk] = []
+    results = []
     search_cursor = 0
-    chunk_idx = 0
 
     for section in header_sections:
         section_text = section.page_content
@@ -162,9 +170,6 @@ def chunk_document(pdf_rel: str, doc_info: dict) -> List[TextChunk]:
             chunk_type = "paragraph"
 
         for piece in pieces:
-            # 用片段的前50个字符在原文里定位真实字符偏移量,定位不到就退化成
-            # "上一个chunk结束的地方"累加估算——两种情况都标注estimated=true,
-            # 不假装这是精确页码。
             probe = piece[:50]
             found_at = full_text.find(probe, search_cursor)
             if found_at == -1:
@@ -178,41 +183,62 @@ def chunk_document(pdf_rel: str, doc_info: dict) -> List[TextChunk]:
                 char_end = search_cursor + len(piece)
                 search_cursor = char_end
 
-            # quality_flags 检测和position定位都要用原始piece(不含文件名前缀),
-            # 不然"formula-not-decoded"这类检测和在full_text里找偏移量都会失真。
-            quality_flags = detect_chunk_quality_flags(piece)
+            results.append({
+                "piece": piece,
+                "chunk_type": chunk_type,
+                "heading": heading,
+                "char_start": char_start,
+                "char_end": char_end,
+            })
 
-            chunk_id = f"txt_{chunk_idx:05d}"
-            chunk_idx += 1
+    return results
 
-            # 把文件名(不含路径,比如"HW2.pdf")拼进可索引文本——跟之前修复
-            # Caregivers SQL案例(parse_code.py的parse_sql)同一套方案: BM25
-            # 查询里如果提到"SQL"这种词,但chunk原文本身不含这个字面词
-            # (比如一段纯markdown内容,只是恰好在一份.sql文件里),会导致
-            # 检索完全找不到——加上文件名能让文件名里的关键词(比如"sql"、
-            # "HW2"这类)也参与匹配,缓解这类词汇鸿沟问题。这个前缀只影响
-            # 存进索引/展示给LLM的text字段,不影响上面的质量检测和定位逻辑。
-            indexed_text = f"{Path(pdf_rel).name}\n{piece}"
 
-            chunks.append(
-                TextChunk(
-                    chunk_id=chunk_id,
-                    text=indexed_text,
-                    metadata={
-                        "source_type": "text",
-                        "file": pdf_rel,
-                        "course": doc_info["course"],
-                        "chunk_type": chunk_type,
-                        "name": heading,
-                        "position": {
-                            "char_start": char_start,
-                            "char_end": char_end,
-                            "estimated": True,
-                            "note": "Docling/LlamaParse输出markdown不含页码标记,用字符偏移量近似定位,不是页码",
-                        },
-                        "quality": doc_info["quality"],
-                        "chunk_quality_flag": quality_flags,
-                        "extraction_confidence": "medium",
+def chunk_document(pdf_rel: str, doc_info: dict) -> List[TextChunk]:
+    full_text = doc_info["md_path"].read_text(encoding="utf-8")
+
+    chunks: List[TextChunk] = []
+    chunk_idx = 0
+
+    for item in split_into_pieces(full_text):
+        piece = item["piece"]
+        char_start, char_end = item["char_start"], item["char_end"]
+
+        # quality_flags 检测要用原始piece(不含文件名前缀),不然
+        # "formula-not-decoded"这类检测会失真。
+        quality_flags = detect_chunk_quality_flags(piece)
+
+        chunk_id = f"txt_{chunk_idx:05d}"
+        chunk_idx += 1
+
+        # 把文件名(不含路径,比如"HW2.pdf")拼进可索引文本——跟之前修复
+        # Caregivers SQL案例(parse_code.py的parse_sql)同一套方案: BM25
+        # 查询里如果提到"SQL"这种词,但chunk原文本身不含这个字面词
+        # (比如一段纯markdown内容,只是恰好在一份.sql文件里),会导致
+        # 检索完全找不到——加上文件名能让文件名里的关键词(比如"sql"、
+        # "HW2"这类)也参与匹配,缓解这类词汇鸿沟问题。这个前缀只影响
+        # 存进索引/展示给LLM的text字段,不影响上面的质量检测和定位逻辑。
+        indexed_text = f"{Path(pdf_rel).name}\n{piece}"
+
+        chunks.append(
+            TextChunk(
+                chunk_id=chunk_id,
+                text=indexed_text,
+                metadata={
+                    "source_type": "text",
+                    "file": pdf_rel,
+                    "course": doc_info["course"],
+                    "chunk_type": item["chunk_type"],
+                    "name": item["heading"],
+                    "position": {
+                        "char_start": char_start,
+                        "char_end": char_end,
+                        "estimated": True,
+                        "note": "Docling/LlamaParse输出markdown不含页码标记,用字符偏移量近似定位,不是页码",
+                    },
+                    "quality": doc_info["quality"],
+                    "chunk_quality_flag": quality_flags,
+                    "extraction_confidence": "medium",
                         "source_note": doc_info["source_note"],
                     },
                 )

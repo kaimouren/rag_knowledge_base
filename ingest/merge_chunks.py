@@ -1,7 +1,10 @@
 """
-把文本知识类chunk(run_chunk_text_full.py的输出)、代码知识类chunk
-(parse_code.py的输出)、数据摘要类chunk(summarize_data.py的输出)转成
-同一套统一schema,合并成一份完整数据集。
+把文本知识类chunk(chunk_text_mineru.py的输出,全量445个PDF改用MinerU
+重新解析后带真实page_start/page_end的版本,替换了之前chunk_text.py+
+run_chunk_text_full.py那条Docling/LlamaParse混合产线——原因见
+LIMITATIONS.md"页码信息"一节)、代码知识类chunk(parse_code.py的输出)、
+数据摘要类chunk(summarize_data.py的输出)转成同一套统一schema,合并成
+一份完整数据集。
 
 数据摘要类(source_type="data_summary")本身生成的时候就已经是统一schema
 格式(见summarize_data.py::build_chunk),这里直接读取文件、不需要额外的
@@ -40,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from parse_code import PARSERS
 from run_parse_code_full import collect_files
 
-TEXT_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "text_chunks.json"
+TEXT_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "text_chunks_mineru.json"
 DATA_SUMMARY_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "data_summary_chunks.json"
 OUTPUT_PATH = Path(__file__).parent / "_test_output" / "combined_chunks.json"
 

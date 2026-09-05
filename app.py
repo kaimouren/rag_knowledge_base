@@ -91,6 +91,12 @@ def render_sources(items):
                 f"类型: {meta.get('source_type', '?')}/{meta.get('chunk_type', '?')}  |  "
                 f"chunk_id: {cid}  |  RRF分数: {score:.5f}"
             )
+            # source_citation 只有文本知识类chunk才有(chunk_text_mineru.py生成,
+            # 页码来自MinerU content_list.json的page_idx,不是估算值——详见
+            # LIMITATIONS.md"页码信息"一节),代码/数据摘要类没有这个字段,
+            # 不强行展示
+            if meta.get("source_citation"):
+                st.caption(f"📍 来源定位: {meta['source_citation']}")
 
             flags = _normalize_flags(meta.get("chunk_quality_flag"))
             for flag in flags:

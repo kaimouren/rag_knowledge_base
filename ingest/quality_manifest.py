@@ -27,6 +27,32 @@ quality_router判定过的PDF标注三种状态之一:
 
 用法:
     python ingest/quality_manifest.py
+
+---
+【后续状态变更,2026-09】本模块产出的 quality_manifest.json 仍然如实记录了
+"当时"那次Docling+LlamaParse预算分配决策,继续保留作为历史记录——但它的
+good/degraded/llamaparse_done三态标签已经不再描述"现在索引里的文本chunk
+是怎么产出的"。439个文档(6个pending除外)全部改用MinerU重新解析,不再有
+"部分文档用更贵的工具"这种差异,三态分层本身依赖的前提(不同文档走了不同
+质量的工具)不再成立。
+
+现在的质量信号来源改成:
+  - ingest/mineru_parse_report.csv: 记录MinerU解析成功/失败(目前439/439成功)
+  - chunk_quality_flag(chunk_text_mineru.py产出,chunk粒度而非文档粒度):
+    fragmented(行碎片化)、formula_unverifiable(chunk含独立公式块,MinerU
+    对这类公式的识别结果没有任何置信度信号,无法自动判断对错——见
+    LIMITATIONS.md"公式可信度风险"一节)、formula_low_confidence(chunk所在页
+    有行内公式被MinerU自己的OCR置信度判定为低分,阈值0.6)
+  - previous_docling_quality(chunk_text_mineru.py保留的历史字段): 直接
+    继承自本manifest的旧good/degraded/llamaparse_done标签,纯粹作为"这份
+    文档在旧pipeline下曾经被怎么评估过"的历史参考,不代表当前质量判断
+  - 注意: detect_chunk_quality_flags()里的formula_missing、
+    has_unresolved_image两个flag是针对Docling输出的占位符字符串
+    ("formula-not-decoded"、"<!-- image -->")设计的,MinerU的markdown
+    输出不产生这两种占位符(公式要么被转成真实LaTeX,要么整个不出现;
+    图片是"![](images/...)"格式),实测439个文档的chunk里这两个flag
+    出现次数为0——不是没检测到问题,是这两个flag对MinerU产线而言是
+    已知失效的检测逻辑,如实记录在这里,不是自然为0。
 """
 
 import csv
