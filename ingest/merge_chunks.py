@@ -3,8 +3,10 @@
 重新解析后带真实page_start/page_end的版本,替换了之前chunk_text.py+
 run_chunk_text_full.py那条Docling/LlamaParse混合产线——原因见
 LIMITATIONS.md"页码信息"一节)、代码知识类chunk(parse_code.py的输出)、
-数据摘要类chunk(summarize_data.py的输出)转成同一套统一schema,合并成
-一份完整数据集。
+数据摘要类chunk(summarize_data.py的输出)、图片类chunk(chunk_images.py
+的输出,11115张MinerU裁剪图+独立图片文件的OCR/VLM结果,同样带
+page_start/page_end,过程见LIMITATIONS.md"图片处理"一节)转成同一套
+统一schema,合并成一份完整数据集。
 
 数据摘要类(source_type="data_summary")本身生成的时候就已经是统一schema
 格式(见summarize_data.py::build_chunk),这里直接读取文件、不需要额外的
@@ -45,6 +47,7 @@ from run_parse_code_full import collect_files
 
 TEXT_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "text_chunks_mineru.json"
 DATA_SUMMARY_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "data_summary_chunks.json"
+IMAGE_CHUNKS_PATH = Path(__file__).parent / "_test_output" / "image_chunks.json"
 OUTPUT_PATH = Path(__file__).parent / "_test_output" / "combined_chunks.json"
 
 HIGH_CONFIDENCE_TYPES = {
@@ -112,6 +115,10 @@ def collect_code_chunks_unified():
 
 
 def main():
+    old_total = None
+    if OUTPUT_PATH.exists():
+        old_total = len(json.load(open(OUTPUT_PATH, encoding="utf-8")))
+
     text_chunks = json.load(open(TEXT_CHUNKS_PATH, encoding="utf-8"))
     print(f"文本知识类chunk数: {len(text_chunks)}")
 
@@ -121,11 +128,17 @@ def main():
     data_summary_chunks = json.load(open(DATA_SUMMARY_CHUNKS_PATH, encoding="utf-8"))
     print(f"数据摘要类chunk数: {len(data_summary_chunks)}")
 
-    combined = text_chunks + code_chunks + data_summary_chunks
+    image_chunks = json.load(open(IMAGE_CHUNKS_PATH, encoding="utf-8"))
+    print(f"图片类chunk数: {len(image_chunks)}")
+
+    combined = text_chunks + code_chunks + data_summary_chunks + image_chunks
     with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
         json.dump(combined, f, ensure_ascii=False, indent=2)
 
-    print(f"\n合并后总chunk数: {len(combined)}")
+    print(f"\n合并前总chunk数: {old_total if old_total is not None else '(无历史文件)'}")
+    print(f"合并后总chunk数: {len(combined)}")
+    if old_total is not None:
+        print(f"净增加: {len(combined) - old_total}")
     print(f"已保存至: {OUTPUT_PATH}")
 
 
