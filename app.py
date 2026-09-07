@@ -9,6 +9,7 @@ Streamlit前端: 复用 query/hybrid_query.py 的检索+生成逻辑,加一层�
     streamlit run app.py
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -50,6 +51,24 @@ FLAG_MESSAGES = {
 }
 
 MAX_CHUNK_CHARS_SHOWN = 2000
+
+# LaTeX来源不是没渲染,是定界符对不上: 实测过(2026-09问lasso regression的
+# 真实回答), GPT生成的回答里公式用的是 \(...\) / \[...\] (标准LaTeX惯用
+# 写法), 但Streamlit的st.markdown/st.write走MathJax渲染,只认$...$和
+# $$...$$ 两种定界符(试过st.latex()单独渲染的方案,但回答是"文字+公式"混排,
+# 拆分渲染反而破坏阅读连贯性,不如直接转定界符再整体丢给markdown简单)。
+# chunk原文这边不需要转: MinerU自己的latex-delimiter-config配的就是$/$$
+# (ingest/_test_output的mineru.json能看到),天然跟Streamlit兼容;这个转换
+# 函数对chunk原文调用也没坏处,是防御性的,万一某个chunk(尤其VLM生成的
+# 图片描述,同样是GPT输出,同样用\(\)习惯)也用了反斜杠定界符。
+_LATEX_BLOCK_RE = re.compile(r"\\\[(.*?)\\\]", re.DOTALL)
+_LATEX_INLINE_RE = re.compile(r"\\\((.*?)\\\)", re.DOTALL)
+
+
+def normalize_latex_delims(text: str) -> str:
+    text = _LATEX_BLOCK_RE.sub(r"$$\1$$", text)
+    text = _LATEX_INLINE_RE.sub(r"$\1$", text)
+    return text
 
 
 def _normalize_flags(raw):
@@ -105,7 +124,15 @@ def render_sources(items):
             shown_text = text
             if len(text) > MAX_CHUNK_CHARS_SHOWN:
                 shown_text = text[:MAX_CHUNK_CHARS_SHOWN] + f"\n...(已截断,原文共{len(text)}字符)"
-            st.text(shown_text)
+            if meta.get("source_type") in ("text", "image"):
+                # 只有text/image来源可能包含LaTeX(MinerU解析/VLM描述),
+                # 才走markdown渲染;code/data_summary保持st.text纯文本——
+                # 代码里的#/*/_这些字符一旦被当markdown解析会被错误地
+                # 渲染成标题/斜体,不是"多渲染点格式"这么简单,是真的会
+                # 显示错误
+                st.markdown(normalize_latex_delims(shown_text))
+            else:
+                st.text(shown_text)
 
 
 def run_query(question: str, embed_model, collection, bm25_store, openai_client):
@@ -123,7 +150,7 @@ def run_query(question: str, embed_model, collection, bm25_store, openai_client)
         answer = generate_answer(openai_client, prompt)
 
     st.markdown("### 回答")
-    st.write(answer)
+    st.markdown(normalize_latex_delims(answer))
     render_sources(items)
 
 
